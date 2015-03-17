@@ -1,0 +1,30 @@
+{
+  "name": "vinyl-singer",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jkeylu/vinyl-singer.git"
+  },
+  "author": "jKey Lu <jkeylu@gmail.com> (https://github.com/jkeylu)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jkeylu/vinyl-singer/issues"
+  },
+  "homepage": "https://github.com/jkeylu/vinyl-singer",
+  "dependencies": {
+    "bl": "~0.9.4",
+    "lame": "~1.2.0",
+    "node-mpg123-util": "0.0.1",
+    "speaker": "~0.2.4",
+    "vinyl": "~0.4.6"
+  },
+  "devDependencies": {
+    "gulp": "~3.8.11",
+    "mocha": "~2.2.1"
+  }
+}
