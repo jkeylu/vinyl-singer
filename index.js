@@ -6,47 +6,45 @@ var stream = require('stream')
   , util = require('util')
   , Decoder = require('lame').Decoder
   , Speaker = require('speaker')
-  , BufferList = require('bl')
   , mpg123Util = require('node-mpg123-util');
 
 util.inherits(Singer, Transform);
 
-function SingerState(singer, options) {
-  var self = this;
-
-  this.decoder = new Decoder();
-  this.speaker = new Speaker();
-
-  this.decoder.on('format', function() {
-    process.nextTick(function() {
-      singer.turnTo(self.volume);
-    });
-  });
-
-  this.decoder.pipe(this.speaker);
-
+function SingerState(options) {
   this.file = null;
-  this.stream = null;
-  this.singing = false;
+  this.decoder = null;
+  this.speaker = null;
+
   this.transformcb = null;
+  this.singing = false;
 
   var vol = options.defaultVolume;
-  this.volume = (vol || vol === 0) ? vol : 100;
+  this.volume = (vol || vol === 0) ? vol : 1;
+
+  var hwm = options.decoderHighWaterMark;
+  this.decoderHighWaterMark = (hwm || hwm === 0) ? hwm : 4 * 1024;
+  this.decoderHighWaterMark = ~~this.decoderHighWaterMark;
 }
 
 function onEofSong(singer) {
   var ss = singer._singerState;
 
-  if (ss.file != null && ss.stream != null) {
+  if (ss.file != null && ss.decoder != null && ss.speaker != null) {
     var file = ss.file
       , cb = ss.transformcb;
 
     if (!cb)
       return singer.emit('error', 'no transformcb in Singer class');
 
-    ss.stream.unpipe();
+    ss.decoder.unpipe();
+
+    if (ss.file.isStream())
+      ss.file.contents.unpipe();
+
     ss.file = null;
     ss.stream = null;
+    ss.decoder = null;
+    ss.speaker = null;
     ss.transformcb = null;
     ss.singing = false;
 
@@ -59,7 +57,7 @@ function Singer(options) {
   options = options || {};
   options.objectMode = true;
 
-  this._singerState = new SingerState(this, options);
+  this._singerState = new SingerState(options);
 
   Transform.call(this, options);
 }
@@ -68,18 +66,25 @@ Singer.prototype._transform = function(file, encoding, cb) {
   var self = this
     , ss = this._singerState;
 
-  ss.transformcb = cb;
   ss.file = file;
-  ss.stream = file.isBuffer() ? new BufferList(file.contents) : file.contents;
-  //ss.stream = file.pipe(new PassThrough({ highWaterMark: 4 * 1024 }));
-  ss.stream.once('end', function() {
-    if (this == ss.stream) {
-      onEofSong(self);
-    }
+  ss.transformcb = cb;
+
+  ss.decoder = new Decoder({ highWaterMark: ss.decoderHighWaterMark });
+  ss.decoder.on('format', function() {
+    process.nextTick(function() {
+      self.turnTo(ss.volume);
+    });
   });
 
+  ss.speaker = new Speaker();
+  ss.speaker.on('finish', function() {
+    if (this == ss.speaker) {
+      onEofSong(self);
+    }
+  })
+
   ss.singing = true;
-  ss.stream.pipe(ss.decoder, { end: false });
+  ss.file.pipe(ss.decoder).pipe(ss.speaker);
 };
 
 Singer.prototype.nextSong = function() {
@@ -89,7 +94,7 @@ Singer.prototype.nextSong = function() {
 Singer.prototype.pauseSong = function() {
   var ss = this._singerState;
   if (ss.singing) {
-    ss.stream.unpipe();
+    ss.decoder.upipe();
     ss.singing = false;
     this.emit('pauseSong');
   }
@@ -99,13 +104,23 @@ Singer.prototype.resumeSong = function() {
   var ss = this._singerState;
   if (!ss.singing && ss.stream != null) {
     ss.singing = true;
-    ss.stream.pipe(ss.decoder, { end: false });
+    ss.decoder.pipe(ss.speaker);
     this.emit('resumeSong');
   }
 };
 
 Singer.prototype.turnTo = function(vol) {
+  var ss = this._singerState;
+  if (ss.singing && ss.decoder) {
+    return mpg123Util.setVolume(ss.decoder.mh, vol);
+  }
 };
 
 Singer.prototype.getVolume = function() {
+  var ss = this._singerState;
+  if (ss.singing && ss.decoder) {
+    return mpg123Util.getVolume(ss.decoder.mh);
+  } else {
+    return ss.volume;
+  }
 };
