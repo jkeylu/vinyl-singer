@@ -54,6 +54,10 @@ function onEofSong(singer) {
 }
 
 function Singer(options) {
+  if (!(this instanceof Singer)) {
+    return new Singer(options);
+  }
+
   options = options || {};
   options.objectMode = true;
 
@@ -85,6 +89,7 @@ Singer.prototype._transform = function(file, encoding, cb) {
 
   ss.singing = true;
   ss.file.pipe(ss.decoder).pipe(ss.speaker);
+  this.emit('singSong', ss.file);
 };
 
 Singer.prototype.nextSong = function() {
@@ -94,7 +99,7 @@ Singer.prototype.nextSong = function() {
 Singer.prototype.pauseSong = function() {
   var ss = this._singerState;
   if (ss.singing) {
-    ss.decoder.upipe();
+    ss.decoder.unpipe();
     ss.singing = false;
     this.emit('pauseSong');
   }
@@ -102,7 +107,7 @@ Singer.prototype.pauseSong = function() {
 
 Singer.prototype.resumeSong = function() {
   var ss = this._singerState;
-  if (!ss.singing && ss.stream != null) {
+  if (!ss.singing && ss.decoder != null && ss.speaker != null) {
     ss.singing = true;
     ss.decoder.pipe(ss.speaker);
     this.emit('resumeSong');
@@ -123,4 +128,9 @@ Singer.prototype.getVolume = function() {
   } else {
     return ss.volume;
   }
+};
+
+Singer.prototype.getCurrentSong = function() {
+  var ss = this._singerState;
+  return ss.file;
 };
