@@ -32,6 +32,20 @@ describe('Singer', function() {
     gulp.src(filename).pipe(singer);
   });
 
+  it('should be "stoped" of the state before singing song', function() {
+    var singer = new Singer();
+    assert.equal('stoped', singer.state);
+  });
+
+  it('should be "singing" of the state when singing song', function(done) {
+    var singer = new Singer();
+    singer.on('singSong', function() {
+      assert.equal('singing', singer.state);
+      done();
+    });
+    gulp.src(filename).pipe(singer);
+  });
+
 
   describe('nextSong()', function() {
     it('should singing next song', function(done) {
@@ -41,12 +55,26 @@ describe('Singer', function() {
 
         singer.on('singSong', function(file) {
           var file2 = path.basename(file.path);
-          done(assert.notEqual(file1, file2));
+          assert.notEqual(file1, file2);
+          done();
         });
         singer.nextSong();
       });
 
       gulp.src(fixtures + '/*.mp3').pipe(singer);
+    });
+
+    it('should emit a "finish" event by speaker', function(done) {
+      var singer = new Singer();
+      var ss = singer._singerState;
+      singer.once('singSong', function(file) {
+        ss.speaker.on('finish', function() {
+          done();
+        });
+        singer.nextSong();
+      });
+
+      gulp.src(filename).pipe(singer);
     });
   });
 
@@ -68,7 +96,7 @@ describe('Singer', function() {
       var called = false;
 
       singer.on('singSong', function() {
-        assert.equal(called, false);
+        assert.equal(false, called);
         singer.pauseSong();
       });
       singer.on('pauseSong', function() {
@@ -76,7 +104,19 @@ describe('Singer', function() {
         done();
       });
 
-      assert.equal(called, false);
+      assert.equal(false, called);
+      gulp.src(filename).pipe(singer);
+    });
+
+    it('should be "paused" of the state', function(done) {
+      var singer = new Singer();
+
+      singer.on('singSong', function() {
+        singer.pauseSong();
+        assert.equal('paused', singer.state);
+        done();
+      });
+
       gulp.src(filename).pipe(singer);
     });
   });
@@ -87,12 +127,12 @@ describe('Singer', function() {
       var called = false;
 
       singer.on('singSong', function() {
-        assert.equal(called, false);
+        assert.equal(false, called);
         singer.pauseSong();
       });
       singer.on('pauseSong', function() {
         process.nextTick(function() {
-          assert.equal(called, false);
+          assert.equal(false, called);
           singer.resumeSong();
         });
       });
@@ -101,10 +141,27 @@ describe('Singer', function() {
         done();
       });
 
-      assert.equal(called, false);
+      assert.equal(false, called);
       gulp.src(filename).pipe(singer);
     });
 
+    it('should be "singing" of the state', function(done) {
+      var singer = new Singer();
+
+      singer.on('singSong', function() {
+        assert.equal('singing', singer.state);
+
+        singer.pauseSong();
+        assert.equal('paused', singer.state);
+
+        singer.resumeSong();
+        assert.equal('singing', singer.state);
+        done();
+      });
+
+      assert.equal('stoped', singer.state);
+      gulp.src(filename).pipe(singer);
+    });
   });
 
   describe('turnTo()', function() {
@@ -115,7 +172,8 @@ describe('Singer', function() {
         ss.decoder.on('format', function() {
           var vol = 0.5;
           singer.turnTo(vol);
-          done(assert.equal(vol, singer.getVolume()));
+          assert.equal(vol, singer.getVolume());
+          done();
         });
       });
       gulp.src(filename).pipe(singer);
@@ -128,7 +186,8 @@ describe('Singer', function() {
       singer.on('singSong', function() {
         var ss = singer._singerState;
         ss.decoder.on('format', function() {
-          done(assert('number', typeof singer.getVolume()));
+          assert('number', typeof singer.getVolume());
+          done();
         });
       });
       gulp.src(filename).pipe(singer);

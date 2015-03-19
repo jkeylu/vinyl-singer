@@ -10,13 +10,16 @@ var stream = require('stream')
 
 util.inherits(Singer, Transform);
 
-function SingerState(options) {
+function SingerState(singer, options) {
+  this.onEofSong = function() {
+    onEofSong(singer);
+  };
+
   this.file = null;
   this.decoder = null;
   this.speaker = null;
 
   this.transformcb = null;
-  this.singing = false;
 
   var vol = options.defaultVolume;
   this.volume = (vol || vol === 0) ? vol : 1;
@@ -24,6 +27,9 @@ function SingerState(options) {
   var hwm = options.decoderHighWaterMark;
   this.decoderHighWaterMark = (hwm || hwm === 0) ? hwm : 4 * 1024;
   this.decoderHighWaterMark = ~~this.decoderHighWaterMark;
+
+  this.autoFinish = true;
+  this.state = 'stoped';
 }
 
 function onEofSong(singer) {
@@ -41,15 +47,26 @@ function onEofSong(singer) {
     if (ss.file.isStream())
       ss.file.contents.unpipe();
 
-    ss.file = null;
-    ss.stream = null;
-    ss.decoder = null;
-    ss.speaker = null;
-    ss.transformcb = null;
-    ss.singing = false;
+    function finish() {
+      ss.file = null;
+      ss.stream = null;
+      ss.decoder = null;
+      ss.speaker = null;
+      ss.transformcb = null;
+      ss.state = 'stoped';
 
-    if(cb)
-      cb(null, file);
+      if (cb)
+        cb(null, file);
+    }
+
+    if (ss.autoFinish) {
+      finish();
+    } else {
+      ss.autoFinish = true;
+      ss.speaker.removeListener('finish', ss.onEofSong);
+      ss.speaker.on('finish', finish);
+      ss.speaker.end();
+    }
   }
 }
 
@@ -61,7 +78,7 @@ function Singer(options) {
   options = options || {};
   options.objectMode = true;
 
-  this._singerState = new SingerState(options);
+  this._singerState = new SingerState(this, options);
 
   Transform.call(this, options);
 }
@@ -81,49 +98,47 @@ Singer.prototype._transform = function(file, encoding, cb) {
   });
 
   ss.speaker = new Speaker();
-  ss.speaker.on('finish', function() {
-    if (this == ss.speaker) {
-      onEofSong(self);
-    }
-  })
+  ss.speaker.on('finish', ss.onEofSong);
 
-  ss.singing = true;
+  ss.state = 'singing';
   ss.file.pipe(ss.decoder).pipe(ss.speaker);
   this.emit('singSong', ss.file);
 };
 
 Singer.prototype.nextSong = function() {
-  onEofSong(this);
+  var ss = this._singerState;
+  ss.autoFinish = false;
+  ss.onEofSong();
 };
 
 Singer.prototype.pauseSong = function() {
   var ss = this._singerState;
-  if (ss.singing) {
+  if (ss.state == 'singing') {
     ss.decoder.unpipe();
-    ss.singing = false;
+    ss.state = 'paused';
     this.emit('pauseSong');
   }
 };
 
 Singer.prototype.resumeSong = function() {
   var ss = this._singerState;
-  if (!ss.singing && ss.decoder != null && ss.speaker != null) {
-    ss.singing = true;
+  if (ss.state == 'paused' && ss.decoder != null && ss.speaker != null) {
     ss.decoder.pipe(ss.speaker);
+    ss.state = 'singing';
     this.emit('resumeSong');
   }
 };
 
 Singer.prototype.turnTo = function(vol) {
   var ss = this._singerState;
-  if (ss.singing && ss.decoder) {
+  if (ss.state == 'singing' && ss.decoder) {
     return mpg123Util.setVolume(ss.decoder.mh, vol);
   }
 };
 
 Singer.prototype.getVolume = function() {
   var ss = this._singerState;
-  if (ss.singing && ss.decoder) {
+  if (ss.state == 'singing' && ss.decoder) {
     return mpg123Util.getVolume(ss.decoder.mh);
   } else {
     return ss.volume;
@@ -134,3 +149,9 @@ Singer.prototype.getCurrentSong = function() {
   var ss = this._singerState;
   return ss.file;
 };
+
+Object.defineProperty(Singer.prototype, 'state', {
+  get: function() {
+    return this._singerState.state;
+  }
+});
