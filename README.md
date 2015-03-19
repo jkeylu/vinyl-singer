@@ -1,5 +1,7 @@
 # vinyl-singer
 
+[![NPM](https://nodei.co/npm/vinyl-singer.png)](https://nodei.co/npm/vinyl-singer/)
+
 ## Example
 
 ``` javascript
