@@ -165,6 +165,24 @@ describe('Singer', function() {
   });
 
   describe('turnTo()', function() {
+    it('should emit a "volumeChanged" event', function(done) {
+      var singer = new Singer();
+      var vol = 0.5;
+      singer.on('singSong', function() {
+        var ss = singer._singerState;
+        ss.decoder.on('format', function() {
+          singer.turnTo(vol);
+        });
+      });
+
+      singer.on('volumeChanged', function() {
+        assert.equal(vol, singer.getVolume());
+        done();
+      });
+
+      gulp.src(filename).pipe(singer);
+    });
+
     it('should equal to getVolume()', function(done) {
       var singer = new Singer();
       singer.on('singSong', function() {

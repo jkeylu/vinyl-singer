@@ -84,8 +84,7 @@ function Singer(options) {
 }
 
 Singer.prototype._transform = function(file, encoding, cb) {
-  var self = this
-    , ss = this._singerState;
+  var ss = this._singerState;
 
   ss.file = file;
   ss.transformcb = cb;
@@ -93,7 +92,8 @@ Singer.prototype._transform = function(file, encoding, cb) {
   ss.decoder = new Decoder({ highWaterMark: ss.decoderHighWaterMark });
   ss.decoder.on('format', function() {
     process.nextTick(function() {
-      self.turnTo(ss.volume);
+      if (ss.decoder != null)
+        mpg123Util.setVolume(ss.decoder.mh, ss.volume);
     });
   });
 
@@ -132,7 +132,9 @@ Singer.prototype.resumeSong = function() {
 Singer.prototype.turnTo = function(vol) {
   var ss = this._singerState;
   if (ss.state == 'singing' && ss.decoder) {
-    return mpg123Util.setVolume(ss.decoder.mh, vol);
+    ss.volume = vol;
+    mpg123Util.setVolume(ss.decoder.mh, vol);
+    this.emit('volumeChanged');
   }
 };
 
