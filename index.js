@@ -91,8 +91,8 @@ function Singer(options) {
 }
 
 Singer.prototype.pipe = function(dest, pipeOpts) {
-  debug('origin isTransformer: %s, now isTransformer: true', ss.isTransformer);
   var ss = this._singerState;
+  debug('origin isTransformer: %s, now isTransformer: true', ss.isTransformer);
   ss.isTransformer = true;
   Transform.prototype.pipe.call(this, dest, pipeOpts);
 };

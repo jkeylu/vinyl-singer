@@ -1,6 +1,7 @@
 var path = require('path')
   , assert = require('assert')
   , gulp = require('gulp')
+  , PassThrough = require('stream').PassThrough
   , Singer = require('../')
   , fixtures = path.resolve(__dirname, 'fixtures');
 
@@ -44,6 +45,15 @@ describe('Singer', function() {
       done();
     });
     gulp.src(filename).pipe(singer);
+  });
+
+  it('should be transformer after pipe another writable stream', function() {
+    var singer = new Singer()
+      , ss = singer._singerState;
+    gulp.src(fixtures + '/*.mp3').pipe(singer);
+    assert(!ss.isTransformer);
+    singer.pipe(new PassThrough());
+    assert(ss.isTransformer);
   });
 
 
