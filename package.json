@@ -28,9 +28,9 @@
   "homepage": "https://github.com/jkeylu/vinyl-singer",
   "dependencies": {
     "debug": "~2.2.0",
-    "lame": "~1.2.2",
-    "node-mpg123-util": "0.0.1",
-    "speaker": "~0.2.5"
+    "lame": "~1.2.3",
+    "node-mpg123-util": "0.0.2",
+    "speaker": "~0.2.6"
   },
   "devDependencies": {
     "gulp": "~3.8.11",
